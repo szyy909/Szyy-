@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Szy — Video Hub</title>
+  <style>
+    :root{
+      --bg:#f8fafc; --card:#fff; --text:#0f172a; --muted:#475569; --accent:#0ea5e9;
+    }
+    @media (prefers-color-scheme: dark){
+      :root{ --bg:#071021; --card:#071827; --text:#e6eef6; --muted:#9fb3c8; --accent:#38bdf8;}
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Roboto,'Segoe UI',Arial; background:var(--bg); color:var(--text);}    
+    header{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid rgba(0,0,0,0.06);position:sticky;top:0;background:var(--bg);z-index:10}
+    .logo{font-weight:700;font-size:18px;color:var(--accent)}
+    .search{flex:1;display:flex;gap:8px}
+    .search input{flex:1;padding:8px 12px;border-radius:10px;border:1px solid rgba(0,0,0,0.06);background:var(--card);color:var(--text)}
+    .btn{background:var(--accent);color:white;padding:8px 12px;border-radius:10px;border:none;cursor:pointer}
+    .container{display:grid;grid-template-columns:260px 1fr;gap:18px;padding:18px}
+    @media (max-width:880px){.container{grid-template-columns:1fr;}}
+    .sidebar{background:var(--card);padding:12px;border-radius:14px;box-shadow:0 6px 20px rgba(2,6,23,0.06)}
+    .nav-item{padding:8px;border-radius:8px;cursor:pointer}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+    .thumb{background:var(--card);padding:8px;border-radius:12px;overflow:hidden;box-shadow:0 4px 16px rgba(2,6,23,0.06)}
+    .thumb video{width:100%;height:130px;object-fit:cover;border-radius:8px}
+    footer{padding:12px;text-align:center;color:var(--muted)}
+    .muted{color:var(--muted)}
+    .modal-backdrop{position:fixed;inset:0;background:rgba(2,6,23,0.45);display:flex;align-items:center;justify-content:center;z-index:50}
+    .modal{background:var(--card);padding:18px;border-radius:12px;max-width:400px;width:90%}
+    .input{padding:8px;border-radius:8px;border:1px solid rgba(0,0,0,0.06);width:100%}
+    
+    /* Tombol + melayang */
+    #uploadBtn {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      font-size: 30px;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      z-index: 20;
+      transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+    #uploadBtn:hover { transform: scale(1.1); }
+    #uploadBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Mode mobile */
+    body.mobile #uploadBtn {
+      right: 16px;
+      bottom: 16px;
+      width: 70px;
+      height: 70px;
+      font-size: 40px;
+    }
+    body.mobile header { flex-wrap: wrap; gap: 6px; }
+    body.mobile .search { width: 100%; }
+    body.mobile .container { padding: 10px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">Szy</div>
+    <div class="search">
+      <input id="searchInput" placeholder="Cari video..." />
+      <button class="btn" id="searchBtn">Cari</button>
+    </div>
+    <button class="btn" id="loginBtn">Login</button>
+    <button id="logoutBtn" class="btn" style="display:none;background:#ef4444">Logout</button>
+    <input id="fileInput" type="file" accept="video/*" style="display:none" />
+  </header>
+
+  <div class="container">
+    <aside class="sidebar">
+      <div style="font-weight:700;margin-bottom:8px">Menu</div>
+      <div class="nav-item" data-view="home">🏠 Beranda</div>
+      <div class="nav-item" data-view="myvideos">🎞 Video Saya</div>
+      <div class="nav-item" data-view="settings">⚙ Pengaturan</div>
+    </aside>
+
+    <main>
+      <section id="homeView">
+        <div style="font-weight:700;margin-bottom:8px">Rekomendasi</div>
+        <div id="grid" class="grid"></div>
+      </section>
+
+      <section id="myvideosView" style="display:none">
+        <div style="font-weight:700;margin-bottom:8px">Video Saya</div>
+        <div id="myGrid" class="grid"></div>
+      </section>
+
+      <section id="settingsView" style="display:none">
+        <div style="font-weight:700;margin-bottom:8px">Pengaturan</div>
+        <div class="muted">Tema mengikuti sistem.</div>
+      </section>
+    </main>
+  </div>
+
+  <footer>Made with ❤ — Szy</footer>
+
+  <!-- Tombol + melayang -->
+  <button id="uploadBtn" title="Upload">＋</button>
+
+  <!-- Modal Login -->
+  <div id="loginModal" class="modal-backdrop" style="display:none">
+    <div class="modal">
+      <h3>Masuk ke Szy</h3>
+      <input id="username" class="input" placeholder="Username" /><br>
+      <input id="password" type="password" class="input" placeholder="Password" /><br>
+      <button id="doLogin" class="btn">Login</button>
+      <button id="openRegister" class="btn" style="background:transparent;color:var(--accent)">Daftar</button>
+    </div>
+  </div>
+
+  <!-- Modal Register -->
+  <div id="registerModal" class="modal-backdrop" style="display:none">
+    <div class="modal">
+      <h3>Buat Akun</h3>
+      <input id="regUser" class="input" placeholder="Username" /><br>
+      <input id="regPass" type="password" class="input" placeholder="Password" /><br>
+      <button id="doRegister" class="btn">Daftar</button>
+      <button id="closeReg" class="btn" style="background:transparent;color:var(--accent)">Batal</button>
+    </div>
+  </div>
+
+  <!-- Modal Preview Upload -->
+  <div id="previewModal" class="modal-backdrop" style="display:none">
+    <div class="modal">
+      <h3>Pratinjau Video</h3>
+      <video id="previewVideo" controls style="width:100%;border-radius:8px;"></video>
+      <div style="margin-top:10px;display:flex;gap:10px;justify-content:flex-end;">
+        <button id="cancelUpload" class="btn" style="background:#6b7280;">Batal</button>
+        <button id="confirmUpload" class="btn">Upload</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // === Deteksi perangkat ===
+    const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+    if(isMobile) document.body.classList.add("mobile");
+
+    // === IndexedDB untuk video ===
+    const DB_NAME='szy_videos_db',DB_VERSION=1;let db;
+    function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,DB_VERSION);r.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains('videos'))d.createObjectStore('videos',{keyPath:'id'});};r.onsuccess=e=>{db=e.target.result;res(db)};r.onerror=e=>rej(e);});}
+    function saveVideo(entry){return new Promise((res,rej)=>{const tx=db.transaction('videos','readwrite');tx.objectStore('videos').put(entry).onsuccess=()=>res();tx.onerror=e=>rej(e);});}
+    function getAllVideos(){return new Promise((res,rej)=>{const tx=db.transaction('videos','readonly');const req=tx.objectStore('videos').getAll();req.onsuccess=()=>res(req.result);req.onerror=e=>rej(e);});}
+    function deleteVideo(id){return new Promise((res,rej)=>{const tx=db.transaction('videos','readwrite');tx.objectStore('videos').delete(id).onsuccess=()=>res();tx.onerror=e=>rej(e);});}
+
+    const grid=document.getElementById('grid');
+    const myGrid=document.getElementById('myGrid');
+    const fileInput=document.getElementById('fileInput');
+    const uploadBtn=document.getElementById('uploadBtn');
+
+    // === Login/Register ===
+    const loginModal=document.getElementById('loginModal');
+    const registerModal=document.getElementById('registerModal');
+    const loginBtn=document.getElementById('loginBtn');
+    const logoutBtn=document.getElementById('logoutBtn');
+
+    function getUsers(){return JSON.parse(localStorage.getItem('szy_users')||'{}');}
+    function saveUsers(o){localStorage.setItem('szy_users',JSON.stringify(o));}
+    function getLogged(){return localStorage.getItem('szy_logged');}
+    function setLogged(u){localStorage.setItem('szy_logged',u);}
+    function logout(){localStorage.removeItem('szy_logged');location.reload();}
+
+    loginBtn.onclick=()=>loginModal.style.display='flex';
+    document.getElementById('openRegister').onclick=()=>{loginModal.style.display='none';registerModal.style.display='flex';};
+    document.getElementById('closeReg').onclick=()=>registerModal.style.display='none';
+    document.getElementById('doRegister').onclick=()=>{
+      const u=document.getElementById('regUser').value.trim(),p=document.getElementById('regPass').value;
+      if(!u||!p)return alert('Lengkapi semua');
+      const users=getUsers();if(users[u])return alert('Username sudah ada');
+      users[u]={pass:btoa(p)};saveUsers(users);
+      alert('Akun dibuat! Silakan login.');registerModal.style.display='none';
+    };
+    document.getElementById('doLogin').onclick=()=>{
+      const u=document.getElementById('username').value.trim(),p=document.getElementById('password').value;
+      const users=getUsers();if(!users[u]||users[u].pass!==btoa(p))return alert('Salah username/password');
+      setLogged(u);alert('Selamat datang '+u);loginModal.style.display='none';updateLoginState();
+    };
+    logoutBtn.onclick=logout;
+
+    function updateLoginState(){
+      const user=getLogged();
+      if(user){
+        loginBtn.style.display='none';logoutBtn.style.display='inline-block';
+        uploadBtn.disabled=false;uploadBtn.style.display='block';
+      }else{
+        logoutBtn.style.display='none';loginBtn.style.display='inline-block';
+        uploadBtn.disabled=true;uploadBtn.style.display='none';
+      }
+    }
+
+    // === Upload + Preview ===
+    const previewModal=document.getElementById('previewModal');
+    const previewVideo=document.getElementById('previewVideo');
+    const cancelUpload=document.getElementById('cancelUpload');
+    const confirmUpload=document.getElementById('confirmUpload');
+    let pendingFile=null;
+
+    uploadBtn.onclick=()=>{
+      if(!getLogged()){alert('Harap login dulu!');return;}
+      fileInput.click();
+    };
+
+    fileInput.onchange=e=>{
+      const f=e.target.files[0];
+      if(!f)return;
+      pendingFile=f;
+      const url=URL.createObjectURL(f);
+      previewVideo.src=url;
+      previewModal.style.display='flex';
+    };
+
+    cancelUpload.onclick=()=>{
+      previewModal.style.display='none';
+      pendingFile=null;
+      fileInput.value='';
+    };
+
+    confirmUpload.onclick=async()=>{
+      if(!pendingFile)return;
+      const entry={id:Date.now().toString(),user:getLogged(),name:pendingFile.name,size:pendingFile.size,blob:pendingFile,created:Date.now()};
+      await saveVideo(entry);
+      alert('Video tersimpan!');
+      previewModal.style.display='none';
+      pendingFile=null;
+      fileInput.value='';
+      renderAll();
+    };
+
+    // === Tampilan ===
+    document.querySelectorAll('[data-view]').forEach(v=>v.onclick=()=>showView(v.dataset.view));
+    function showView(v){['home','myvideos','settings'].forEach(id=>document.getElementById(id+'View').style.display=(id===v)?'':'none');}
+
+    async function renderAll(filter=''){
+      const vids=await getAllVideos();
+      const user=getLogged();
+      grid.innerHTML=''; myGrid.innerHTML='';
+      for(const v of vids.filter(x=>x.name.toLowerCase().includes(filter))){
+        const url=URL.createObjectURL(v.blob);
+        const el=document.createElement('div'); el.className='thumb';
+        el.innerHTML=`<video src="${url}" controls></video><div>${v.name}</div><div class="muted">${Math.round(v.size/1024)} KB</div>`;
+        grid.appendChild(el);
+        if(v.user===user){
+          const copy=el.cloneNode(true);
+          const del=document.createElement('button');
+          del.className='btn';del.textContent='Hapus';
+          del.onclick=async()=>{if(confirm('Hapus video?')){await deleteVideo(v.id);renderAll();}};
+          copy.appendChild(del);
+          myGrid.appendChild(copy);
+        }
+      }
+      if(!vids.length)grid.innerHTML='<div class="muted">Belum ada video. Klik + untuk upload.</div>';
+    }
+
+    document.getElementById('searchBtn').onclick=()=>{
+      const q=document.getElementById('searchInput').value.toLowerCase();
+      renderAll(q);
+    };
+
+    (async()=>{await openDB();updateLoginState();await renderAll();})();
+  </script>
+</body>
+</html>
