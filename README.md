@@ -1,2 +1,1 @@
-# Szyy-
-welcome
+# Szyy
